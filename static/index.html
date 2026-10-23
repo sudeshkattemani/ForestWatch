@@ -1,0 +1,1131 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForestWatch AI Dashboard</title>
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    :root {
+      --bg: #07130f;
+      --panel: #10231b;
+      --panel2: #152c22;
+      --border: #294537;
+      --text: #e8f5eb;
+      --muted: #9bb5a3;
+      --green: #46e68a;
+      --red: #ff6b6b;
+      --yellow: #ffd166;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 18px 24px;
+      background: #0b1c14;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon { font-size: 30px; }
+
+    h1 { font-size: 23px; margin: 0; }
+    h2 { font-size: 17px; margin: 0 0 16px; }
+    h3 { font-size: 15px; margin: 0 0 10px; }
+
+    .subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      display: inline-block;
+      border-radius: 50%;
+      background: var(--yellow);
+    }
+
+    .dot.good { background: var(--green); }
+    .dot.bad { background: var(--red); }
+
+    main {
+      max-width: 1500px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stat, .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .stat { padding: 17px; }
+    .stat-label { color: var(--muted); font-size: 12px; }
+    .stat-value { font-size: 28px; font-weight: bold; margin-top: 9px; }
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .panel { padding: 18px; margin-bottom: 18px; }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .video-wrap {
+      position: relative;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      overflow: hidden;
+      min-height: 240px;
+      aspect-ratio: 4 / 3;
+    }
+
+    video, #overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #overlay { pointer-events: none; }
+
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 13px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 14px;
+      background: var(--panel2);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button.primary {
+      background: var(--green);
+      color: #07130f;
+      border-color: var(--green);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .message {
+      padding: 10px 12px;
+      border-radius: 7px;
+      background: #0a1a12;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 12px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .detection-list, .alert-list, .node-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .detection, .alert, .node {
+      background: #0a1a12;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .detection {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .confidence {
+      color: var(--green);
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .empty {
+      padding: 18px 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #map {
+      width: 100%;
+      height: 300px;
+      border-radius: 8px;
+      background: #0a1a12;
+      z-index: 1;
+    }
+
+    .alert-title { font-weight: bold; margin-bottom: 6px; }
+    .alert-meta { font-size: 11px; color: var(--muted); line-height: 1.7; }
+
+    .pill {
+      font-size: 10px;
+      padding: 4px 7px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+    }
+
+    footer {
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      main { padding: 12px; }
+      header { padding: 15px; }
+    }
+
+    @media (max-width: 420px) {
+      .stat-value { font-size: 23px; }
+      .stat { padding: 12px; }
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="brand">
+    <span class="brand-icon">🌲</span>
+    <div>
+      <h1>ForestWatch AI</h1>
+      <div class="subtitle">AI-powered forest monitoring dashboard</div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span class="dot" id="serverDot"></span>
+    <span id="serverStatus">Checking backend...</span>
+  </div>
+
+  <span class="status">
+    <span class="dot" id="modelDot"></span>
+    <span id="modelStatus">Model not initialized</span>
+  </span>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-label">Alerts Today</div>
+      <div class="stat-value" id="sToday">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Active Detections</div>
+      <div class="stat-value red" id="sActive">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Nodes Online</div>
+      <div class="stat-value green" id="sNodes">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">GPS</div>
+      <div class="stat-value" id="sGPS" style="font-size:18px">Waiting</div>
+    </div>
+  </section>
+
+  <section class="layout">
+    <div>
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>📷 Live AI Detection</h2>
+          <span class="pill">Edge Impulse · 96 × 96</span>
+        </div>
+
+        <div class="video-wrap">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+          <div class="video-placeholder" id="videoPlaceholder">
+            Camera is stopped.<br>
+            Select Start Webcam to begin.
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="primary" id="startCamera">Start Webcam</button>
+          <button id="stopCamera" disabled>Stop Webcam</button>
+          <button id="runDetection" disabled>Run Detection</button>
+        </div>
+
+        <div class="message" id="cameraMessage">
+          Camera has not started.
+        </div>
+
+        <div class="message" id="modelMessage">
+          Model files are loaded from static/forestwatch-model/browser/.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>🎯 Detection Results</h2>
+          <span class="pill" id="detectionCount">0 objects</span>
+        </div>
+        <div class="detection-list" id="detectionList">
+          <div class="empty">Waiting for model inference.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>🖥️ Monitoring Nodes</h2>
+          <button id="refreshNodes">Refresh</button>
+        </div>
+        <div class="node-list" id="nodeList">
+          <div class="empty">Loading nodes...</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>📍 Forest GPS Map</h2>
+          <button id="locateMe">Get My Location</button>
+        </div>
+        <div id="map"></div>
+        <div class="message" id="gpsMessage">
+          GPS location has not been requested.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>🚨 Recent Alerts</h2>
+          <button id="refreshAlerts">Refresh</button>
+        </div>
+        <div class="alert-list" id="alertList">
+          <div class="empty">Loading alerts...</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>🔊 Alert Sound</h2>
+          <span class="status"><span class="dot" id="soundDot"></span>
+            <span id="sndStatus">Initializing</span></span>
+        </div>
+        <div class="message">
+          Browsers may require one click or key press before allowing sound.
+          Sound plays when a supported target is detected.
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  ForestWatch AI · Local dashboard · Webcam inference runs in your browser
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Edge Impulse WebAssembly deployment files -->
+<script>
+  var Module = window.Module || {};
+  window.Module = Module;
+</script>
+<script src="/static/forestwatch-model/browser/edge-impulse-standalone.js"></script>
+<script src="/static/forestwatch-model/browser/run-impulse.js"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  const MODEL_WIDTH = 96;
+  const MODEL_HEIGHT = 96;
+  const ALERT_COOLDOWN_MS = 10000;
+  const MIN_CONFIDENCE = 0.50;
+
+  const $ = id => document.getElementById(id);
+
+  const video = $("video");
+  const overlay = $("overlay");
+  const ctx = overlay.getContext("2d");
+  const inputCanvas = document.createElement("canvas");
+  inputCanvas.width = MODEL_WIDTH;
+  inputCanvas.height = MODEL_HEIGHT;
+  const inputCtx = inputCanvas.getContext("2d", {
+    willReadFrequently: true
+  });
+
+  let stream = null;
+  let classifier = null;
+  let modelReady = false;
+  let cameraReady = false;
+  let detecting = false;
+  let inferenceBusy = false;
+  let animationId = null;
+  let audioContext = null;
+  let soundEnabled = false;
+  let lastAlertAt = {};
+  let currentDetections = [];
+  let currentLocation = null;
+  let map = null;
+  let gpsMarker = null;
+  let backendAlerts = [];
+  let localAlerts = [];
+  let lastAlertKey = "";
+  let heartbeatTimer = null;
+
+  const TARGET_LABELS = [
+    "Arrow Detected",
+    "Chainsaw Detected",
+    "Gun Detected",
+    "Human Detected",
+    "Timber found",
+    "Vehicle Detected"
+  ];
+
+  function setMessage(id, text) {
+    $(id).textContent = text;
+  }
+
+  function setStatus(dotId, textId, state, message) {
+    $(dotId).className = "dot" +
+      (state === true ? " good" : state === false ? " bad" : "");
+    $(textId).textContent = message;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
+
+  function displayLabel(label) {
+    return String(label || "Unknown object");
+  }
+
+  function confidenceValue(value) {
+    let number = Number(value || 0);
+    if (number > 1) number /= 100;
+    return Math.max(0, Math.min(1, number));
+  }
+
+  // Initialize audio automatically. Browsers may still require user interaction.
+  async function enableAlertSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error("Web Audio is unavailable");
+
+      if (!audioContext) audioContext = new AudioCtx();
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      soundEnabled = audioContext.state === "running";
+      setStatus("soundDot", "sndStatus", soundEnabled,
+        soundEnabled ? "Alert sound on" : "Waiting for browser permission");
+    } catch (error) {
+      soundEnabled = false;
+      setStatus("soundDot", "sndStatus", false, "Sound unavailable");
+      console.warn("Audio unavailable:", error);
+    }
+  }
+
+  function beep() {
+    if (!audioContext || !soundEnabled ||
+        audioContext.state !== "running") return;
+
+    [0, 0.24].forEach(offset => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(
+        0.15, audioContext.currentTime + offset + 0.02
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001, audioContext.currentTime + offset + 0.18
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(audioContext.currentTime + offset);
+      oscillator.stop(audioContext.currentTime + offset + 0.19);
+    });
+  }
+
+  async function unlockSound() {
+    await enableAlertSound();
+    if (soundEnabled) {
+      document.removeEventListener("click", unlockSound);
+      document.removeEventListener("keydown", unlockSound);
+    }
+  }
+
+  document.addEventListener("click", unlockSound);
+  document.addEventListener("keydown", unlockSound);
+  enableAlertSound();
+
+  // Initialize map without assuming a particular forest location.
+  function initializeMap() {
+    if (!window.L) {
+      setMessage("gpsMessage", "Map library failed to load. Check your internet connection.");
+      return;
+    }
+
+    map = L.map("map").setView([20, 0], 2);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+  }
+
+  function requestGPS() {
+    if (!navigator.geolocation) {
+      setMessage("gpsMessage", "This browser does not support geolocation.");
+      return;
+    }
+
+    setMessage("gpsMessage", "Requesting GPS permission...");
+
+    navigator.geolocation.getCurrentPosition(position => {
+      currentLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      };
+
+      $("sGPS").textContent =
+        currentLocation.latitude.toFixed(4) + ", " +
+        currentLocation.longitude.toFixed(4);
+
+      if (map) {
+        if (gpsMarker) gpsMarker.remove();
+
+        gpsMarker = L.marker([
+          currentLocation.latitude,
+          currentLocation.longitude
+        ]).addTo(map).bindPopup("Current browser location");
+
+        map.setView([
+          currentLocation.latitude,
+          currentLocation.longitude
+        ], 14);
+      }
+
+      setMessage("gpsMessage",
+        "Location obtained. Accuracy: approximately " +
+        Math.round(currentLocation.accuracy) + " metres.");
+
+      sendHeartbeat();
+    }, error => {
+      const messages = {
+        1: "Location permission was denied. Allow location access in your browser.",
+        2: "Your current location is unavailable.",
+        3: "The location request timed out."
+      };
+      setMessage("gpsMessage",
+        messages[error.code] || "Unable to obtain GPS location.");
+    }, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 30000
+    });
+  }
+
+  async function apiRequest(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(path + " returned HTTP " + response.status);
+    }
+
+    const type = response.headers.get("content-type") || "";
+    if (type.includes("application/json")) return response.json();
+    return {};
+  }
+
+  async function checkBackend() {
+    try {
+      await apiRequest("/nodes");
+      setStatus("serverDot", "serverStatus", true, "Backend connected");
+    } catch (error) {
+      setStatus("serverDot", "serverStatus", false, "Backend unavailable");
+      console.warn("Backend check failed:", error);
+    }
+  }
+
+  async function sendHeartbeat() {
+    try {
+      await apiRequest("/heartbeat", {
+        method: "POST",
+        body: JSON.stringify({
+          node_id: "forestwatch-browser",
+          node: "forestwatch-browser",
+          status: "online",
+          latitude: currentLocation?.latitude ?? null,
+          longitude: currentLocation?.longitude ?? null,
+          source: "browser"
+        })
+      });
+    } catch (error) {
+      // A backend may use a different heartbeat payload schema.
+      console.warn("Heartbeat was not accepted:", error);
+    }
+  }
+
+  function getArray(data, keys) {
+    if (Array.isArray(data)) return data;
+    if (!data || typeof data !== "object") return [];
+
+    for (const key of keys) {
+      if (Array.isArray(data[key])) return data[key];
+    }
+
+    return [];
+  }
+
+  async function loadAlerts() {
+    try {
+      const data = await apiRequest("/alerts");
+      backendAlerts = getArray(data, ["alerts", "items", "results"]);
+      renderAlerts();
+    } catch (error) {
+      setMessage("alertList",
+        "Unable to load server alerts. Check the Flask terminal.");
+      console.warn("Loading alerts failed:", error);
+    }
+  }
+
+  async function loadNodes() {
+    try {
+      const data = await apiRequest("/nodes");
+      const nodes = getArray(data, ["nodes", "items", "results"]);
+      $("sNodes").textContent = nodes.filter(node =>
+        node && (node.online === true ||
+          node.status === "online" ||
+          node.is_online === true)
+      ).length;
+
+      if (!nodes.length) {
+        $("nodeList").innerHTML =
+          '<div class="empty">No monitoring nodes reported by the backend.</div>';
+        return;
+      }
+
+      $("nodeList").innerHTML = nodes.map(node => {
+        const name = node.name || node.node_id || node.id || "Monitoring node";
+        const online = node.online === true ||
+          node.status === "online" || node.is_online === true;
+
+        return `<div class="node">
+          <div class="panel-heading">
+            <strong>${escapeHtml(name)}</strong>
+            <span class="status"><span class="dot ${online ? "good" : "bad"}"></span>
+              ${online ? "Online" : "Offline"}</span>
+          </div>
+          <div class="alert-meta">${escapeHtml(
+            node.last_seen || node.last_heartbeat || node.updated_at || ""
+          )}</div>
+        </div>`;
+      }).join("");
+    } catch (error) {
+      $("nodeList").innerHTML =
+        '<div class="empty">Unable to load nodes. Check the Flask terminal.</div>';
+      console.warn("Loading nodes failed:", error);
+    }
+  }
+
+  function renderAlerts() {
+    const all = [...localAlerts, ...backendAlerts].slice(0, 20);
+
+    $("sToday").textContent = all.filter(alert => {
+      const time = new Date(
+        alert.timestamp || alert.created_at || alert.time || 0
+      );
+      const now = new Date();
+      return !Number.isNaN(time.getTime()) &&
+        time.toDateString() === now.toDateString();
+    }).length;
+
+    if (!all.length) {
+      $("alertList").innerHTML =
+        '<div class="empty">No alerts yet. Target detections will appear here.</div>';
+      return;
+    }
+
+    $("alertList").innerHTML = all.map(alert => {
+      const label = alert.label || alert.message || alert.type || "Forest alert";
+      const time = alert.timestamp || alert.created_at || alert.time || "";
+      const confidence = alert.confidence == null
+        ? "" : " · " + Math.round(confidenceValue(alert.confidence) * 100) + "% confidence";
+      const coords = alert.latitude != null && alert.longitude != null
+        ? `${Number(alert.latitude).toFixed(5)}, ${Number(alert.longitude).toFixed(5)}`
+        : "GPS unavailable";
+
+      return `<div class="alert">
+        <div class="alert-title">🚨 ${escapeHtml(label)}</div>
+        <div class="alert-meta">${escapeHtml(time)}${escapeHtml(confidence)}</div>
+        <div class="alert-meta">Location: ${escapeHtml(coords)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function resizeOverlay() {
+    if (!video.videoWidth || !video.videoHeight) return;
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+  }
+
+  async function startCamera() {
+    if (cameraReady) return;
+
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+      setMessage("cameraMessage",
+        "Camera access is unavailable. Use http://127.0.0.1:5000/ and a supported browser.");
+      return;
+    }
+
+    $("startCamera").disabled = true;
+    setMessage("cameraMessage", "Requesting camera access...");
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "environment",
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      });
+
+      video.srcObject = stream;
+      await video.play();
+
+      cameraReady = true;
+      $("stopCamera").disabled = false;
+      $("runDetection").disabled = false;
+      $("videoPlaceholder").style.display = "none";
+
+      resizeOverlay();
+      video.addEventListener("loadedmetadata", resizeOverlay);
+      setMessage("cameraMessage",
+        "Camera is running. Click Run Detection to start AI inference.");
+    } catch (error) {
+      $("startCamera").disabled = false;
+      console.error("Camera error:", error);
+
+      const reason = error.name === "NotAllowedError"
+        ? "Camera permission was denied. Allow camera access in your browser site settings."
+        : error.name === "NotFoundError"
+        ? "No camera was found. Connect a webcam and try again."
+        : error.name === "NotReadableError"
+        ? "The camera may be in use by another application. Close other camera apps and retry."
+        : "Could not start the camera: " + error.message;
+
+      setMessage("cameraMessage", reason);
+    }
+  }
+
+  function stopCamera() {
+    detecting = false;
+    inferenceBusy = false;
+
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = null;
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    video.srcObject = null;
+    cameraReady = false;
+    $("startCamera").disabled = false;
+    $("stopCamera").disabled = true;
+    $("runDetection").disabled = true;
+    $("videoPlaceholder").style.display = "flex";
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    setMessage("cameraMessage", "Camera stopped.");
+  }
+
+  async function initializeModel() {
+    if (modelReady) return true;
+
+    setMessage("modelMessage", "Initializing Edge Impulse model...");
+    setStatus("modelDot", "modelStatus", null, "Loading model...");
+
+    try {
+      if (typeof EdgeImpulseClassifier === "undefined") {
+        throw new Error(
+          "EdgeImpulseClassifier was not found. Check the two script paths and browser console."
+        );
+      }
+
+      classifier = new EdgeImpulseClassifier();
+      await classifier.init();
+
+      modelReady = true;
+      setStatus("modelDot", "modelStatus", true, "Model ready");
+      setMessage("modelMessage", "Edge Impulse model initialized successfully.");
+      return true;
+    } catch (error) {
+      modelReady = false;
+      setStatus("modelDot", "modelStatus", false, "Model failed");
+      setMessage("modelMessage",
+        "Model initialization failed: " + error.message);
+      console.error("Model initialization failed:", error);
+      return false;
+    }
+  }
+
+  function prepareFeatures() {
+    inputCtx.drawImage(video, 0, 0, MODEL_WIDTH, MODEL_HEIGHT);
+    const image = inputCtx.getImageData(
+      0, 0, MODEL_WIDTH, MODEL_HEIGHT
+    );
+
+    // Edge Impulse raw RGB pixel format:
+    // one packed RGB pixel per Float32 element.
+    const features = new Float32Array(MODEL_WIDTH * MODEL_HEIGHT);
+
+    for (let i = 0; i < features.length; i++) {
+      const p = i * 4;
+      features[i] =
+        (image.data[p] << 16) |
+        (image.data[p + 1] << 8) |
+        image.data[p + 2];
+    }
+
+    return features;
+  }
+
+  function normalizeResults(output) {
+    if (Array.isArray(output)) return output;
+    if (!output || typeof output !== "object") return [];
+
+    if (Array.isArray(output.results)) return output.results;
+    if (Array.isArray(output.bounding_boxes)) return output.bounding_boxes;
+    if (Array.isArray(output.detections)) return output.detections;
+    if (Array.isArray(output.result)) {
+      const nested = output.result.find(item => item &&
+        (Array.isArray(item.bounding_boxes) ||
+         Array.isArray(item.detections)));
+      if (nested) {
+        return nested.bounding_boxes || nested.detections;
+      }
+      return output.result;
+    }
+
+    return [];
+  }
+
+  function boxFor(item) {
+    const box = item.bounding_box || item.boundingBox || item.box || item;
+    let x = Number(box.x ?? 0);
+    let y = Number(box.y ?? 0);
+    let width = Number(box.width ?? box.w ?? 0);
+    let height = Number(box.height ?? box.h ?? 0);
+
+    // Convert normalized [0,1] coordinates if provided.
+    if (x >= 0 && x <= 1 && width > 0 && width <= 1 &&
+        (x + width) <= 1.01) {
+      x *= MODEL_WIDTH;
+      width *= MODEL_WIDTH;
+    }
+    if (y >= 0 && y <= 1 && height > 0 && height <= 1 &&
+        (y + height) <= 1.01) {
+      y *= MODEL_HEIGHT;
+      height *= MODEL_HEIGHT;
+    }
+
+    const scaleX = overlay.width / MODEL_WIDTH;
+    const scaleY = overlay.height / MODEL_HEIGHT;
+
+    return {
+      x: x * scaleX,
+      y: y * scaleY,
+      width: width * scaleX,
+      height: height * scaleY
+    };
+  }
+
+  function drawDetections(detections) {
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    ctx.lineWidth = Math.max(2, overlay.width / 300);
+    ctx.font = `${Math.max(12, overlay.width / 45)}px Arial`;
+
+    detections.forEach(item => {
+      const box = boxFor(item);
+      if (!box.width || !box.height) return;
+
+      const confidence = confidenceValue(item.value ?? item.confidence);
+      const label = displayLabel(item.label);
+
+      ctx.strokeStyle = "#46e68a";
+      ctx.fillStyle = "#46e68a";
+      ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+      const text = label + " " + Math.round(confidence * 100) + "%";
+      const textWidth = ctx.measureText(text).width + 10;
+      const textY = Math.max(0, box.y - 24);
+
+      ctx.fillRect(box.x, textY, textWidth, 23);
+      ctx.fillStyle = "#07130f";
+      ctx.fillText(text, box.x + 5, textY + 16);
+    });
+  }
+
+  function renderDetections(detections) {
+    currentDetections = detections;
+    $("sActive").textContent = detections.length;
+    $("detectionCount").textContent =
+      detections.length + (detections.length === 1 ? " object" : " objects");
+
+    if (!detections.length) {
+      $("detectionList").innerHTML =
+        '<div class="empty">No objects detected in this frame.</div>';
+      return;
+    }
+
+    $("detectionList").innerHTML = detections.map(item => {
+      const label = displayLabel(item.label);
+      const confidence = confidenceValue(item.value ?? item.confidence);
+
+      return `<div class="detection">
+        <div>
+          <strong>${escapeHtml(label)}</strong>
+          <div class="alert-meta">Object detection</div>
+        </div>
+        <span class="confidence">${Math.round(confidence * 100)}%</span>
+      </div>`;
+    }).join("");
+  }
+
+  function isTarget(label) {
+    return TARGET_LABELS.some(target =>
+      target.toLowerCase() === String(label).toLowerCase()
+    );
+  }
+
+  async function postAlert(item) {
+    const label = displayLabel(item.label);
+    const now = Date.now();
+
+    if (now - (lastAlertAt[label] || 0) < ALERT_COOLDOWN_MS) return;
+    lastAlertAt[label] = now;
+
+    const confidence = confidenceValue(item.value ?? item.confidence);
+    const alert = {
+      label,
+      message: label + " detected by ForestWatch webcam",
+      confidence,
+      timestamp: new Date().toISOString(),
+      source: "webcam",
+      node_id: "forestwatch-browser",
+      latitude: currentLocation?.latitude ?? null,
+      longitude: currentLocation?.longitude ?? null
+    };
+
+    localAlerts.unshift(alert);
+    localAlerts = localAlerts.slice(0, 20);
+    renderAlerts();
+    beep();
+
+    try {
+      await apiRequest("/alert", {
+        method: "POST",
+        body: JSON.stringify(alert)
+      });
+      await loadAlerts();
+    } catch (error) {
+      // The local alert is still visible even if the API rejects the payload.
+      console.warn("Posting alert failed:", error);
+    }
+  }
+
+  async function runOneInference() {
+    if (!cameraReady || !video.videoWidth || !modelReady) return;
+
+    const output = await classifier.classify(prepareFeatures());
+    const results = normalizeResults(output);
+
+    const detections = results.filter(item =>
+      item && item.label &&
+      confidenceValue(item.value ?? item.confidence) >= MIN_CONFIDENCE
+    );
+
+    drawDetections(detections);
+    renderDetections(detections);
+
+    for (const item of detections) {
+      if (isTarget(item.label)) {
+        await postAlert(item);
+      }
+    }
+  }
+
+  async function inferenceLoop() {
+    if (!detecting || inferenceBusy) return;
+
+    inferenceBusy = true;
+
+    try {
+      await runOneInference();
+      setMessage("cameraMessage",
+        "AI inference is running. Target detections are sent to Flask.");
+    } catch (error) {
+      console.error("Inference error:", error);
+      setMessage("modelMessage",
+        "Inference failed: " + error.message +
+        ". Check the model input format and browser console.");
+    } finally {
+      inferenceBusy = false;
+    }
+
+    if (detecting) {
+      animationId = setTimeout(() => {
+        inferenceLoop();
+      }, 500);
+    }
+  }
+
+  async function startDetection() {
+    if (!cameraReady) {
+      setMessage("cameraMessage", "Start the webcam first.");
+      return;
+    }
+
+    if (!await initializeModel()) return;
+
+    detecting = true;
+    $("runDetection").disabled = true;
+    setMessage("cameraMessage", "Starting AI inference...");
+    inferenceLoop();
+
+    // Re-enable button after a short delay so it can be used to retry.
+    setTimeout(() => {
+      $("runDetection").disabled = !cameraReady;
+    }, 1500);
+  }
+
+  $("startCamera").addEventListener("click", startCamera);
+  $("stopCamera").addEventListener("click", stopCamera);
+  $("runDetection").addEventListener("click", startDetection);
+
+  $("refreshAlerts").addEventListener("click", loadAlerts);
+  $("refreshNodes").addEventListener("click", loadNodes);
+  $("locateMe").addEventListener("click", requestGPS);
+
+  // Initial dashboard data.
+  initializeMap();
+  checkBackend();
+  loadAlerts();
+  loadNodes();
+  requestGPS();
+
+  heartbeatTimer = setInterval(() => {
+    checkBackend();
+    loadAlerts();
+    loadNodes();
+    sendHeartbeat();
+  }, 30000);
+
+  window.addEventListener("beforeunload", () => {
+    stopCamera();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+  });
+})();
+</script>
+</body>
+</html>
